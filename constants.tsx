@@ -99,7 +99,10 @@ export const TRANSLATIONS = {
       sortBy: 'Ordenar por',
       recent: 'Mais recentes',
       back: 'Voltar',
-      share: 'Partilhar'
+      share: 'Partilhar',
+      delete: 'Remover',
+      confirmDelete: 'Tem a certeza que deseja remover? Esta ação não pode ser desfeita.',
+      actions: 'Ações'
     },
     detail: {
       characteristics: 'Características',
@@ -183,6 +186,7 @@ export const TRANSLATIONS = {
       title: 'Dashboard Stand',
       subtitle: 'Stand Verificado',
       newAd: 'Novo Anúncio',
+      myVehicles: 'Os Meus Veículos',
       weeklyPerformance: 'Performance Semanal',
       recentLeads: 'Leads Recentes',
       viewAll: 'Ver tudo',
@@ -194,11 +198,28 @@ export const TRANSLATIONS = {
       subtitle: 'Visão Geral da Plataforma',
       stats: ['Usuários', 'Stands Ativos', 'Anúncios', 'Leads Mensais'],
       standsManagement: 'Gestão de Parceiros',
+      usersManagement: 'Gestão de Usuários',
+      blogManagement: 'Gestão de Blog',
+      newArticle: 'Novo Artigo',
+      createArticle: 'Criar Artigo',
+      articleTitle: 'Título do Artigo',
+      articleAuthor: 'Autor',
+      articleReadingTime: 'Tempo de Leitura (ex: 5 min)',
+      articleImage: 'URL da Imagem de Capa',
+      articleExcerpt: 'Resumo (Excerto)',
+      articleContent: 'Conteúdo Completo',
       approve: 'Aprovar',
       reject: 'Rejeitar',
       verified: 'Verificado',
       pending: 'Pendente',
-      platformGrowth: 'Crescimento da Plataforma'
+      platformGrowth: 'Crescimento da Plataforma',
+      userList: {
+        name: 'Nome',
+        email: 'Email',
+        role: 'Função',
+        date: 'Data Registo',
+        actions: 'Ações'
+      }
     },
     userArea: {
       greeting: 'Olá, Utilizador',
@@ -282,7 +303,10 @@ export const TRANSLATIONS = {
       sortBy: 'Sort by',
       recent: 'Most recent',
       back: 'Back',
-      share: 'Share'
+      share: 'Share',
+      delete: 'Delete',
+      confirmDelete: 'Are you sure you want to delete? This action cannot be undone.',
+      actions: 'Actions'
     },
     detail: {
       characteristics: 'Key Features',
@@ -366,6 +390,7 @@ export const TRANSLATIONS = {
       title: 'Dealer Dashboard',
       subtitle: 'Verified Dealership',
       newAd: 'New Listing',
+      myVehicles: 'My Vehicles',
       weeklyPerformance: 'Weekly Performance',
       recentLeads: 'Recent Leads',
       viewAll: 'View all',
@@ -377,11 +402,28 @@ export const TRANSLATIONS = {
       subtitle: 'Platform Overview',
       stats: ['Users', 'Active Stands', 'Listings', 'Monthly Leads'],
       standsManagement: 'Partner Management',
+      usersManagement: 'User Management',
+      blogManagement: 'Blog Management',
+      newArticle: 'New Article',
+      createArticle: 'Create Article',
+      articleTitle: 'Article Title',
+      articleAuthor: 'Author',
+      articleReadingTime: 'Reading Time (e.g., 5 min)',
+      articleImage: 'Cover Image URL',
+      articleExcerpt: 'Summary (Excerpt)',
+      articleContent: 'Full Content',
       approve: 'Approve',
       reject: 'Reject',
       verified: 'Verified',
       pending: 'Pending',
-      platformGrowth: 'Platform Growth'
+      platformGrowth: 'Platform Growth',
+      userList: {
+        name: 'Name',
+        email: 'Email',
+        role: 'Role',
+        date: 'Joined',
+        actions: 'Actions'
+      }
     },
     userArea: {
       greeting: 'Hello, User',

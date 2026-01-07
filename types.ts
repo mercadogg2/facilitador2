@@ -5,6 +5,15 @@ export enum UserRole {
   ADMIN = 'admin'
 }
 
+export interface UserProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  role: UserRole;
+  stand_name?: string;
+  created_at: string;
+}
+
 export interface Car {
   id: string;
   brand: string;

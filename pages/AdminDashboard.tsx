@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Language, Car, Lead } from '../types';
+import { Language, Car, Lead, UserProfile, UserRole, BlogPost } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabase';
@@ -13,42 +13,113 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
   const t = TRANSLATIONS[lang].admin;
   const tc = TRANSLATIONS[lang].common;
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'ads' | 'stands'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'ads' | 'stands' | 'users' | 'blog'>('overview');
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<Car[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [articles, setArticles] = useState<BlogPost[]>([]);
   const [leadsCount, setLeadsCount] = useState(0);
+  
   const [adSearch, setAdSearch] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  
+  // Article Creation State
+  const [showArticleModal, setShowArticleModal] = useState(false);
+  const [isCreatingArticle, setIsCreatingArticle] = useState(false);
+  const [newArticle, setNewArticle] = useState({
+    title: '',
+    author: 'Equipa Facilitador Car',
+    reading_time: '5 min',
+    image: '',
+    excerpt: '',
+    content: ''
+  });
 
-  // Estados reais buscados do Supabase
+  const fetchPlatformData = async () => {
+    setLoading(true);
+    
+    // Contagem de Carros
+    const { data: carsData } = await supabase.from('cars').select('*');
+    if (carsData) setAds(carsData);
+
+    // Contagem de Leads
+    const { count: lCount } = await supabase.from('leads').select('*', { count: 'exact', head: true });
+    if (lCount !== null) setLeadsCount(lCount);
+
+    // Busca de Usuários (Profiles)
+    const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    if (userData) setUsers(userData);
+
+    // Busca de Artigos
+    const { data: blogData } = await supabase.from('blog_posts').select('*').order('date', { ascending: false });
+    if (blogData) setArticles(blogData);
+
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchPlatformData = async () => {
-      setLoading(true);
-      
-      // Contagem de Carros
-      const { data: carsData } = await supabase.from('cars').select('*');
-      if (carsData) setAds(carsData);
-
-      // Contagem de Leads
-      const { count: lCount } = await supabase.from('leads').select('*', { count: 'exact', head: true });
-      if (lCount !== null) setLeadsCount(lCount);
-
-      setLoading(false);
-    };
     fetchPlatformData();
   }, []);
 
-  const growthData = [
-    { name: 'Jan', ads: 120, leads: 400 },
-    { name: 'Fev', ads: 150, leads: 520 },
-    { name: 'Mar', ads: 180, leads: 610 },
-    { name: 'Abr', ads: 240, leads: 800 },
-    { name: 'Mai', ads: 320, leads: 1200 },
-    { name: 'Jun', ads: 450, leads: 1500 },
-  ];
+  const handleDeleteAd = async (id: string) => {
+    if (!window.confirm(tc.confirmDelete)) return;
+    const { error } = await supabase.from('cars').delete().eq('id', id);
+    if (!error) setAds(prev => prev.filter(ad => ad.id !== id));
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (!window.confirm(tc.confirmDelete)) return;
+    const { error } = await supabase.from('profiles').delete().eq('id', id);
+    if (!error) setUsers(prev => prev.filter(user => user.id !== id));
+  };
+
+  const handleDeleteArticle = async (id: string) => {
+    if (!window.confirm(tc.confirmDelete)) return;
+    const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+    if (!error) setArticles(prev => prev.filter(art => art.id !== id));
+  };
+
+  const handleCreateArticle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreatingArticle(true);
+    
+    const { data, error } = await supabase.from('blog_posts').insert([{
+      ...newArticle,
+      date: new Date().toISOString().split('T')[0]
+    }]).select();
+
+    if (!error && data) {
+      setArticles(prev => [data[0], ...prev]);
+      setShowArticleModal(false);
+      setNewArticle({
+        title: '',
+        author: 'Equipa Facilitador Car',
+        reading_time: '5 min',
+        image: '',
+        excerpt: '',
+        content: ''
+      });
+    } else {
+      alert("Erro ao criar artigo");
+    }
+    setIsCreatingArticle(false);
+  };
 
   const filteredAds = useMemo(() => 
     ads.filter(a => a.brand.toLowerCase().includes(adSearch.toLowerCase()) || a.model.toLowerCase().includes(adSearch.toLowerCase())),
   [ads, adSearch]);
+
+  const filteredUsers = useMemo(() => 
+    users.filter(u => u.full_name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase())),
+  [users, userSearch]);
+
+  const getRoleBadge = (role: UserRole) => {
+    switch(role) {
+      case UserRole.ADMIN: return <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-[10px] font-bold uppercase">Staff</span>;
+      case UserRole.STAND: return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-[10px] font-bold uppercase">Stand</span>;
+      default: return <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-[10px] font-bold uppercase">Visitor</span>;
+    }
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-8">
@@ -63,6 +134,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
             {[
               { id: 'overview', icon: 'fa-chart-pie', label: lang === 'pt' ? 'Visão Geral' : 'Overview' },
               { id: 'ads', icon: 'fa-ad', label: lang === 'pt' ? 'Anúncios' : 'Ads' },
+              { id: 'users', icon: 'fa-users', label: lang === 'pt' ? 'Usuários' : 'Users' },
+              { id: 'blog', icon: 'fa-newspaper', label: lang === 'pt' ? 'Blog' : 'Blog' },
               { id: 'stands', icon: 'fa-store', label: lang === 'pt' ? 'Parceiros' : 'Stands' }
             ].map(tab => (
               <button
@@ -83,6 +156,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <p className="text-gray-500 text-sm font-medium">{t.stats[0]}</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-2">{loading ? '...' : users.length}</h3>
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <p className="text-gray-500 text-sm font-medium">{t.stats[2]}</p>
                 <h3 className="text-2xl font-bold text-gray-900 mt-2">{loading ? '...' : ads.length}</h3>
               </div>
@@ -91,26 +168,210 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
                 <h3 className="text-2xl font-bold text-gray-900 mt-2">{loading ? '...' : leadsCount}</h3>
               </div>
             </div>
+            {/* Charts would go here */}
+          </div>
+        )}
 
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-              <h3 className="text-xl font-bold mb-8">{t.platformGrowth}</h3>
-              <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={growthData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                    <YAxis axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                    <Area type="monotone" dataKey="leads" stroke="#2563eb" fill="#2563eb" fillOpacity={0.1} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+        {activeTab === 'blog' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-500">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-xl font-bold">{t.blogManagement}</h3>
+              <button 
+                onClick={() => setShowArticleModal(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
+              >
+                <i className="fas fa-plus mr-2"></i>
+                {t.newArticle}
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4">Título</th>
+                    <th className="px-6 py-4">Autor</th>
+                    <th className="px-6 py-4">Data</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {articles.map(article => (
+                    <tr key={article.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-sm text-gray-900">{article.title}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{article.author}</td>
+                      <td className="px-6 py-4 text-xs text-gray-400">{article.date}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => handleDeleteArticle(article.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                          <i className="fas fa-trash-alt"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
+        {/* Modal Artigo */}
+        {showArticleModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in duration-300">
+              <div className="p-8 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h2 className="text-2xl font-bold text-gray-900">{t.newArticle}</h2>
+                <button onClick={() => setShowArticleModal(false)} className="text-gray-400 hover:text-gray-900">
+                  <i className="fas fa-times text-xl"></i>
+                </button>
+              </div>
+              <form onSubmit={handleCreateArticle} className="p-8 space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">{t.articleTitle}</label>
+                  <input 
+                    required 
+                    value={newArticle.title} 
+                    onChange={e => setNewArticle({...newArticle, title: e.target.value})}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">{t.articleAuthor}</label>
+                    <input 
+                      required 
+                      value={newArticle.author} 
+                      onChange={e => setNewArticle({...newArticle, author: e.target.value})}
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">{t.articleReadingTime}</label>
+                    <input 
+                      required 
+                      value={newArticle.reading_time} 
+                      onChange={e => setNewArticle({...newArticle, reading_time: e.target.value})}
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">{t.articleImage}</label>
+                  <input 
+                    required 
+                    value={newArticle.image} 
+                    onChange={e => setNewArticle({...newArticle, image: e.target.value})}
+                    placeholder="https://exemplo.com/imagem.jpg"
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">{t.articleExcerpt}</label>
+                  <textarea 
+                    required 
+                    value={newArticle.excerpt} 
+                    onChange={e => setNewArticle({...newArticle, excerpt: e.target.value})}
+                    rows={2}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">{t.articleContent}</label>
+                  <textarea 
+                    required 
+                    value={newArticle.content} 
+                    onChange={e => setNewArticle({...newArticle, content: e.target.value})}
+                    rows={8}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm resize-none"
+                  />
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={isCreatingArticle}
+                  className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all"
+                >
+                  {isCreatingArticle ? <i className="fas fa-circle-notch animate-spin"></i> : t.createArticle}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Existing Users Tab Code */}
+        {activeTab === 'users' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-500">
+            <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+              <h3 className="text-xl font-bold">{t.usersManagement}</h3>
+              <div className="relative w-full md:w-64">
+                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input 
+                  type="text" 
+                  placeholder={tc.search} 
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-50 border-none outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4">{t.userList.name}</th>
+                    <th className="px-6 py-4">{t.userList.email}</th>
+                    <th className="px-6 py-4">{t.userList.role}</th>
+                    <th className="px-6 py-4">{t.userList.date}</th>
+                    <th className="px-6 py-4 text-right">{t.userList.actions}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400">A carregar usuários...</td></tr>
+                  ) : filteredUsers.length > 0 ? (
+                    filteredUsers.map(user => (
+                      <tr key={user.id} className="hover:bg-gray-50/50 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                              {user.full_name?.[0] || 'U'}
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-900 text-sm">{user.full_name}</p>
+                              {user.stand_name && <p className="text-[10px] text-gray-400">{user.stand_name}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
+                        <td className="px-6 py-4">
+                          {getRoleBadge(user.role)}
+                        </td>
+                        <td className="px-6 py-4 text-xs text-gray-500">
+                          {new Date(user.created_at).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-US')}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                            title={tc.delete}
+                          >
+                            <i className="fas fa-trash-alt"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400">Nenhum usuário encontrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Existing Ads Tab Code */}
         {activeTab === 'ads' && (
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-500">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h3 className="text-xl font-bold">{lang === 'pt' ? 'Anúncios Ativos' : 'Active Ads'}</h3>
               <input 
@@ -128,6 +389,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
                     <th className="px-6 py-4">Veículo</th>
                     <th className="px-6 py-4">Stand</th>
                     <th className="px-6 py-4">Preço</th>
+                    <th className="px-6 py-4 text-right">{tc.actions}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -137,6 +399,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
                       <td className="px-6 py-4 text-sm text-gray-600">{ad.stand_name}</td>
                       <td className="px-6 py-4 font-bold text-blue-600">
                         {new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(ad.price)}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => handleDeleteAd(ad.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                          title={tc.delete}
+                        >
+                          <i className="fas fa-trash-alt"></i>
+                        </button>
                       </td>
                     </tr>
                   ))}

@@ -19,34 +19,46 @@ const StandDashboard: React.FC<DashboardProps> = ({ lang }) => {
   const [myLeads, setMyLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchStandData = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setStandName(user.user_metadata?.stand_name || 'Stand');
+
+      // Busca anúncios do usuário logado
+      const { data: carsData } = await supabase
+        .from('cars')
+        .select('*')
+        .eq('user_id', user.id);
+      
+      if (carsData) setMyCars(carsData);
+
+      // Busca leads dos carros do usuário
+      const { data: leadsData } = await supabase
+        .from('leads')
+        .select('*, cars(brand, model)')
+        .order('created_at', { ascending: false });
+
+      if (leadsData) setMyLeads(leadsData as any);
+    } else {
+      navigate('/login');
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchStandData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setStandName(user.user_metadata?.stand_name || 'Stand');
-
-        // Busca segura via user_id (RLS cuidará do resto)
-        const { data: carsData } = await supabase
-          .from('cars')
-          .select('*')
-          .eq('user_id', user.id);
-        
-        if (carsData) setMyCars(carsData);
-
-        // Busca de leads (O RLS configurado no SQL garante que só vemos leads dos nossos carros)
-        const { data: leadsData } = await supabase
-          .from('leads')
-          .select('*, cars(brand, model)')
-          .order('created_at', { ascending: false });
-
-        if (leadsData) setMyLeads(leadsData as any);
-      } else {
-        navigate('/login');
-      }
-      setLoading(false);
-    };
     fetchStandData();
   }, [navigate]);
+
+  const handleDeleteCar = async (id: string) => {
+    if (!window.confirm(tc.confirmDelete)) return;
+    
+    const { error } = await supabase.from('cars').delete().eq('id', id);
+    if (error) {
+      alert('Erro ao remover: ' + error.message);
+    } else {
+      setMyCars(prev => prev.filter(car => car.id !== id));
+    }
+  };
 
   const statsData = [
     { name: lang === 'pt' ? 'Seg' : 'Mon', leads: 4, views: 120 },
@@ -91,24 +103,59 @@ const StandDashboard: React.FC<DashboardProps> = ({ lang }) => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-            <h3 className="text-xl font-bold mb-8">{t.weeklyPerformance}</h3>
-            <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={statsData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} />
-                  <Tooltip cursor={{fill: '#f8faff'}} />
-                  <Bar dataKey="leads" fill="#2563eb" radius={[6, 6, 0, 0]} barSize={32} />
-                </BarChart>
-              </ResponsiveContainer>
+          <div className="lg:col-span-2 space-y-8">
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+              <h3 className="text-xl font-bold mb-8">{t.weeklyPerformance}</h3>
+              <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={statsData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                    <YAxis axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{fill: '#f8faff'}} />
+                    <Bar dataKey="leads" fill="#2563eb" radius={[6, 6, 0, 0]} barSize={32} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+              <h3 className="text-xl font-bold mb-8">{t.myVehicles}</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-bold">
+                    <tr>
+                      <th className="px-6 py-4">{tc.brand}/{lang === 'pt' ? 'Modelo' : 'Model'}</th>
+                      <th className="px-6 py-4">{tc.price}</th>
+                      <th className="px-6 py-4 text-right">{tc.actions}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {myCars.map(car => (
+                      <tr key={car.id} className="hover:bg-gray-50/50">
+                        <td className="px-6 py-4 font-bold text-sm">{car.brand} {car.model}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-blue-600">
+                          {new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(car.price)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => handleDeleteCar(car.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                          >
+                            <i className="fas fa-trash-alt"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
             <h3 className="text-xl font-bold mb-8">{t.recentLeads}</h3>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                {myLeads.length > 0 ? (
                  myLeads.map(lead => (
                    <div key={lead.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100">

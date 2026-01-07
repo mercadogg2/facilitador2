@@ -87,7 +87,7 @@ const Listings: React.FC<ListingsProps> = ({ lang, onToggleFavorite, favorites }
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="flex flex-col lg:flex-row gap-8">
-        <aside className="w-full lg:w-72 space-y-8">
+        <aside className="w-full lg:w-80 space-y-8 shrink-0">
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 sticky top-24">
             <h3 className="font-bold text-lg mb-6 flex items-center">
               <i className="fas fa-sliders-h mr-2 text-blue-600"></i>
