@@ -1,16 +1,17 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Language, Car, Lead } from '../types';
+import { Language, Car, Lead, UserRole } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabase';
 
 interface DashboardProps {
   lang: Language;
+  role: UserRole;
 }
 
-const StandDashboard: React.FC<DashboardProps> = ({ lang }) => {
+const StandDashboard: React.FC<DashboardProps> = ({ lang, role }) => {
   const t = TRANSLATIONS[lang].dashboard;
   const tc = TRANSLATIONS[lang].common;
   const navigate = useNavigate();
@@ -20,34 +21,50 @@ const StandDashboard: React.FC<DashboardProps> = ({ lang }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchStandData = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setStandName(user.user_metadata?.stand_name || 'Stand');
+    if (role !== UserRole.STAND) {
+       navigate('/login');
+       return;
+    }
 
-      // Busca anúncios do usuário logado
-      const { data: carsData } = await supabase
-        .from('cars')
-        .select('*')
-        .eq('user_id', user.id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (carsData) setMyCars(carsData);
+      // Se tivermos utilizador real no Supabase
+      if (user) {
+        setStandName(user.user_metadata?.stand_name || 'Stand');
 
-      // Busca leads dos carros do usuário
-      const { data: leadsData } = await supabase
-        .from('leads')
-        .select('*, cars(brand, model)')
-        .order('created_at', { ascending: false });
+        // Busca anúncios do usuário logado
+        const { data: carsData } = await supabase
+          .from('cars')
+          .select('*')
+          .eq('user_id', user.id);
+        
+        if (carsData) setMyCars(carsData);
 
-      if (leadsData) setMyLeads(leadsData as any);
-    } else {
-      navigate('/login');
+        // Busca leads dos carros do usuário
+        const { data: leadsData } = await supabase
+          .from('leads')
+          .select('*, cars(brand, model)')
+          .order('created_at', { ascending: false });
+
+        if (leadsData) setMyLeads(leadsData as any);
+      } else {
+        // Fallback para sessão local se as credenciais mestre forem usadas (embora stands costumem ser reais)
+        const localSession = localStorage.getItem('fc_session');
+        if (localSession) {
+          const session = JSON.parse(localSession);
+          setStandName(session.stand_name || 'Meu Stand');
+        }
+      }
+    } catch (e) {
+      console.error("Dashboard data fetch error", e);
     }
     setLoading(false);
   };
 
   useEffect(() => {
     fetchStandData();
-  }, [navigate]);
+  }, [role, navigate]);
 
   const handleDeleteCar = async (id: string) => {
     if (!window.confirm(tc.confirmDelete)) return;

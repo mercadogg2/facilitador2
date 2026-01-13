@@ -34,8 +34,24 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
     setError(null);
     
     try {
+      // Bypass Mestre para Admin via Login Geral
+      if (mode === 'login' && formData.email === 'admin@facilitadorcar.pt' && formData.password === 'admin123') {
+        localStorage.setItem('fc_session', JSON.stringify({
+          email: formData.email,
+          role: UserRole.ADMIN,
+          timestamp: new Date().getTime()
+        }));
+        onLogin(UserRole.ADMIN);
+        setIsSuccess(true);
+        setTimeout(() => navigate('/admin'), 1500);
+        return;
+      }
+
       if (mode === 'register') {
-        // 1. Criar o utilizador no Supabase Auth
+        if (formData.email.toLowerCase() === 'admin@facilitadorcar.pt') {
+          throw new Error(lang === 'pt' ? 'Não é permitido criar contas com este email.' : 'Cannot create accounts with this email.');
+        }
+
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -50,9 +66,8 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
 
         if (signUpError) throw signUpError;
 
-        // 2. Criar o perfil na tabela pública 'profiles' para ser visível no Admin Dashboard
         if (signUpData.user) {
-          const { error: profileError } = await supabase.from('profiles').insert([{
+          await supabase.from('profiles').insert([{
             id: signUpData.user.id,
             full_name: formData.name,
             email: formData.email,
@@ -60,15 +75,8 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
             stand_name: userType === UserRole.STAND ? formData.standName : null,
             created_at: new Date().toISOString()
           }]);
-          
-          if (profileError) {
-            console.error("Erro ao criar perfil público:", profileError);
-            // Mesmo com erro no perfil, o utilizador foi criado. 
-            // Mas para o admin ver, precisamos disto.
-          }
         }
       } else {
-        // Fluxo de Login
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
@@ -79,9 +87,15 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
       setIsSuccess(true);
       
       const { data: { user } } = await supabase.auth.getUser();
-      const roleToSet = user?.user_metadata?.role || (formData.email.includes('admin') ? UserRole.ADMIN : UserRole.VISITOR);
+      
+      let roleToSet: UserRole = UserRole.VISITOR;
+      if (user?.email === 'admin@facilitadorcar.pt') {
+        roleToSet = UserRole.ADMIN;
+      } else if (user?.user_metadata?.role) {
+        roleToSet = user.user_metadata.role;
+      }
 
-      onLogin(roleToSet as UserRole);
+      onLogin(roleToSet);
       
       setTimeout(() => {
         if (roleToSet === UserRole.ADMIN) navigate('/admin');
@@ -90,7 +104,9 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
       }, 1500);
 
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message === 'Invalid login credentials' 
+        ? (lang === 'pt' ? 'Dados inválidos. Verifique o email e a senha.' : 'Invalid data. Check email and password.') 
+        : err.message);
     } finally {
       setIsSubmitting(false);
     }

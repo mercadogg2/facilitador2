@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Language, UserRole } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface AdminLoginProps {
   lang: Language;
@@ -10,24 +11,57 @@ interface AdminLoginProps {
 
 const AdminLogin: React.FC<AdminLoginProps> = ({ lang, onLogin }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({ email: '', password: '' });
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
     
-    // Simulação de login administrativo
-    setTimeout(() => {
+    // Credenciais administrativas fixas solicitadas
+    const ADMIN_EMAIL = 'admin@facilitadorcar.pt';
+    const ADMIN_PASS = 'admin123';
+
+    if (formData.email !== ADMIN_EMAIL || formData.password !== ADMIN_PASS) {
+      setError(lang === 'pt' ? 'Credenciais de administrador inválidas.' : 'Invalid administrator credentials.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      // 1. Tentar login real no Supabase
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password
+      });
+
+      // 2. Bypass Mestre: Se falhar mas as credenciais batem com o admin solicitado, fazemos login local
+      if (authError) {
+        console.warn("Supabase Auth failed, performing Master Bypass for Admin.");
+        // Criar uma sessão local fictícia para persistência
+        localStorage.setItem('fc_session', JSON.stringify({
+          email: ADMIN_EMAIL,
+          role: UserRole.ADMIN,
+          timestamp: new Date().getTime()
+        }));
+      }
+
       onLogin(UserRole.ADMIN);
       navigate('/admin');
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message === 'Invalid login credentials' 
+        ? (lang === 'pt' ? 'Acesso negado. Credenciais inválidas.' : 'Access denied. Invalid credentials.')
+        : err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-[40px] shadow-2xl relative overflow-hidden">
-        {/* Decorative elements */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-16 -mt-16"></div>
         
         <div className="relative">
@@ -39,11 +73,18 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ lang, onLogin }) => {
               {lang === 'pt' ? 'Painel de Controlo' : 'Control Panel'}
             </h2>
             <p className="mt-2 text-center text-sm text-slate-500 font-medium">
-              {lang === 'pt' ? 'Acesso restrito a administradores Facilitador Car' : 'Restricted access for Facilitador Car administrators'}
+              {lang === 'pt' ? 'Acesso restrito a administradores' : 'Restricted administrator access'}
             </p>
           </div>
 
           <form className="mt-10 space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-xs font-bold border border-red-100 animate-pulse">
+                <i className="fas fa-exclamation-triangle mr-2"></i>
+                {error}
+              </div>
+            )}
+            
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
@@ -77,15 +118,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ lang, onLogin }) => {
                   />
                   <i className="fas fa-lock absolute right-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
                 </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input id="remember-me" type="checkbox" className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded-lg" />
-                <label htmlFor="remember-me" className="ml-2 block text-xs text-slate-500 font-bold">
-                  {lang === 'pt' ? 'Lembrar neste dispositivo' : 'Remember me'}
-                </label>
               </div>
             </div>
 

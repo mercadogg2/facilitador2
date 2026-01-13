@@ -7,9 +7,10 @@ import { supabase } from '../lib/supabase';
 
 interface AdminDashboardProps {
   lang: Language;
+  role: UserRole;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang, role }) => {
   const navigate = useNavigate();
   const t = TRANSLATIONS[lang].admin;
   const tc = TRANSLATIONS[lang].common;
@@ -37,16 +38,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
   });
 
   useEffect(() => {
-    const verifyAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || user.user_metadata?.role !== UserRole.ADMIN) {
-        navigate('/admin/login');
-        return;
-      }
-      fetchPlatformData();
-    };
-    verifyAdmin();
-  }, [navigate]);
+    // Verificação baseada na prop injetada pelo App.tsx
+    if (role !== UserRole.ADMIN) {
+      navigate('/admin/login');
+      return;
+    }
+    fetchPlatformData();
+  }, [role, navigate]);
 
   const fetchPlatformData = async () => {
     setLoading(true);

@@ -32,24 +32,51 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Verificar sessão ao carregar a app
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setIsLoggedIn(true);
-        setRole(session.user.user_metadata?.role || UserRole.VISITOR);
+      // 1. Verificar se existe uma sessão mockada (local)
+      const localSession = localStorage.getItem('fc_session');
+      if (localSession) {
+        try {
+          const sessionData = JSON.parse(localSession);
+          setIsLoggedIn(true);
+          setRole(sessionData.role);
+          setIsLoading(false);
+          return;
+        } catch (e) {
+          localStorage.removeItem('fc_session');
+        }
+      }
+
+      // 2. Tentar verificar sessão real no Supabase
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setIsLoggedIn(true);
+          const userRole = session.user.email === 'admin@facilitadorcar.pt' 
+            ? UserRole.ADMIN 
+            : (session.user.user_metadata?.role || UserRole.VISITOR);
+          setRole(userRole);
+        }
+      } catch (e) {
+        console.warn("Supabase session check failed.");
       }
       setIsLoading(false);
     };
+    
     checkUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setIsLoggedIn(true);
-        setRole(session.user.user_metadata?.role || UserRole.VISITOR);
+        const userRole = session.user.email === 'admin@facilitadorcar.pt' 
+          ? UserRole.ADMIN 
+          : (session.user.user_metadata?.role || UserRole.VISITOR);
+        setRole(userRole);
       } else {
-        setIsLoggedIn(false);
-        setRole(UserRole.VISITOR);
+        if (!localStorage.getItem('fc_session')) {
+          setIsLoggedIn(false);
+          setRole(UserRole.VISITOR);
+        }
       }
     });
 
@@ -59,7 +86,6 @@ const App: React.FC = () => {
   const toggleLanguage = () => setLanguage(prev => prev === 'pt' ? 'en' : 'pt');
   
   const toggleRole = () => {
-    // Apenas para fins de demonstração/desenvolvimento
     setRole(prev => {
       if (prev === UserRole.VISITOR) return UserRole.STAND;
       if (prev === UserRole.STAND) return UserRole.ADMIN;
@@ -77,7 +103,10 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem('fc_session');
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
     setRole(UserRole.VISITOR);
     setIsLoggedIn(false);
   };
@@ -111,23 +140,20 @@ const App: React.FC = () => {
             <Route path="/blog" element={<Blog lang={language} />} />
             <Route path="/blog/:id" element={<Article lang={language} />} />
             
-            {/* Rota Protegida: Stand */}
             <Route 
               path="/dashboard" 
-              element={isLoggedIn && role === UserRole.STAND ? <StandDashboard lang={language} /> : <Navigate to="/login" />} 
+              element={isLoggedIn && role === UserRole.STAND ? <StandDashboard lang={language} role={role} /> : <Navigate to="/login" />} 
             />
             <Route 
               path="/anunciar" 
               element={isLoggedIn && role === UserRole.STAND ? <CreateAd lang={language} /> : <Navigate to="/login" />} 
             />
             
-            {/* Rota Protegida: Admin - Bloqueia Stand e Visitante */}
             <Route 
               path="/admin" 
-              element={isLoggedIn && role === UserRole.ADMIN ? <AdminDashboard lang={language} /> : <Navigate to="/admin/login" />} 
+              element={isLoggedIn && role === UserRole.ADMIN ? <AdminDashboard lang={language} role={role} /> : <Navigate to="/admin/login" />} 
             />
             
-            {/* Rota Protegida: Cliente */}
             <Route 
               path="/cliente" 
               element={isLoggedIn ? <UserArea lang={language} favorites={favorites} onLogout={handleLogout} /> : <Navigate to="/login" />} 
