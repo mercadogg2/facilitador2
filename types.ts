@@ -12,6 +12,8 @@ export interface UserProfile {
   role: UserRole;
   stand_name?: string;
   created_at: string;
+  last_sign_in?: string;
+  phone?: string;
 }
 
 export interface Car {
