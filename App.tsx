@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Link } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserRole, Language } from './types';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -19,20 +19,53 @@ import Auth from './pages/Auth';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import AdminLogin from './pages/AdminLogin';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfUse from './pages/TermsOfUse';
+import CookiePolicy from './pages/CookiePolicy';
+import { supabase } from './lib/supabase';
 
 const App: React.FC = () => {
   const [language, setLanguage] = useState<Language>('pt');
   const [role, setRole] = useState<UserRole>(UserRole.VISITOR);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Verificar sessão ao carregar a app
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setIsLoggedIn(true);
+        setRole(session.user.user_metadata?.role || UserRole.VISITOR);
+      }
+      setIsLoading(false);
+    };
+    checkUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setIsLoggedIn(true);
+        setRole(session.user.user_metadata?.role || UserRole.VISITOR);
+      } else {
+        setIsLoggedIn(false);
+        setRole(UserRole.VISITOR);
+      }
+    });
+
+    return () => authListener.subscription.unsubscribe();
+  }, []);
 
   const toggleLanguage = () => setLanguage(prev => prev === 'pt' ? 'en' : 'pt');
   
-  const toggleRole = () => setRole(prev => {
-    if (prev === UserRole.VISITOR) return UserRole.STAND;
-    if (prev === UserRole.STAND) return UserRole.ADMIN;
-    return UserRole.VISITOR;
-  });
+  const toggleRole = () => {
+    // Apenas para fins de demonstração/desenvolvimento
+    setRole(prev => {
+      if (prev === UserRole.VISITOR) return UserRole.STAND;
+      if (prev === UserRole.STAND) return UserRole.ADMIN;
+      return UserRole.VISITOR;
+    });
+  };
 
   const handleToggleFavorite = (id: string) => {
     setFavorites(prev => prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]);
@@ -43,10 +76,19 @@ const App: React.FC = () => {
     setIsLoggedIn(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setRole(UserRole.VISITOR);
     setIsLoggedIn(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <HashRouter>
@@ -68,16 +110,41 @@ const App: React.FC = () => {
             <Route path="/sobre" element={<About lang={language} />} />
             <Route path="/blog" element={<Blog lang={language} />} />
             <Route path="/blog/:id" element={<Article lang={language} />} />
-            <Route path="/dashboard" element={<StandDashboard lang={language} />} />
-            <Route path="/anunciar" element={<CreateAd lang={language} />} />
-            <Route path="/admin" element={<AdminDashboard lang={language} />} />
+            
+            {/* Rota Protegida: Stand */}
+            <Route 
+              path="/dashboard" 
+              element={isLoggedIn && role === UserRole.STAND ? <StandDashboard lang={language} /> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/anunciar" 
+              element={isLoggedIn && role === UserRole.STAND ? <CreateAd lang={language} /> : <Navigate to="/login" />} 
+            />
+            
+            {/* Rota Protegida: Admin - Bloqueia Stand e Visitante */}
+            <Route 
+              path="/admin" 
+              element={isLoggedIn && role === UserRole.ADMIN ? <AdminDashboard lang={language} /> : <Navigate to="/admin/login" />} 
+            />
+            
+            {/* Rota Protegida: Cliente */}
+            <Route 
+              path="/cliente" 
+              element={isLoggedIn ? <UserArea lang={language} favorites={favorites} onLogout={handleLogout} /> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/cliente/editar" 
+              element={isLoggedIn ? <EditProfile lang={language} /> : <Navigate to="/login" />} 
+            />
+
             <Route path="/admin/login" element={<AdminLogin lang={language} onLogin={handleLogin} />} />
-            <Route path="/cliente" element={<UserArea lang={language} favorites={favorites} onLogout={handleLogout} />} />
-            <Route path="/cliente/editar" element={<EditProfile lang={language} />} />
             <Route path="/login" element={<Auth lang={language} mode="login" onLogin={handleLogin} />} />
             <Route path="/registo" element={<Auth lang={language} mode="register" onLogin={handleLogin} />} />
             <Route path="/esqueci-senha" element={<ForgotPassword lang={language} />} />
             <Route path="/redefinir-senha" element={<ResetPassword lang={language} />} />
+            <Route path="/privacidade" element={<PrivacyPolicy lang={language} />} />
+            <Route path="/termos" element={<TermsOfUse lang={language} />} />
+            <Route path="/cookies" element={<CookiePolicy lang={language} />} />
           </Routes>
         </main>
 

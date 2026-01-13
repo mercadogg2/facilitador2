@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../constants';
 
@@ -22,16 +23,17 @@ const Footer: React.FC<FooterProps> = ({ lang }) => {
           <div>
             <h4 className="font-bold mb-4 uppercase text-sm tracking-widest text-gray-500">{t.links}</h4>
             <ul className="space-y-2 text-gray-400 text-sm">
-              <li><a href="#/veiculos">{nav.vehicles}</a></li>
-              <li><a href="#/sobre">{nav.about}</a></li>
-              <li><a href="#/blog">{nav.blog}</a></li>
+              <li><Link to="/veiculos" className="hover:text-white transition-colors">{nav.vehicles}</Link></li>
+              <li><Link to="/sobre" className="hover:text-white transition-colors">{nav.about}</Link></li>
+              <li><Link to="/blog" className="hover:text-white transition-colors">{nav.blog}</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="font-bold mb-4 uppercase text-sm tracking-widest text-gray-500">{t.legal}</h4>
             <ul className="space-y-2 text-gray-400 text-sm">
-              <li><a href="#">{lang === 'pt' ? 'Privacidade' : 'Privacy'}</a></li>
-              <li><a href="#">Cookies</a></li>
+              <li><Link to="/privacidade" className="hover:text-white transition-colors">{lang === 'pt' ? 'Privacidade' : 'Privacy'}</Link></li>
+              <li><Link to="/termos" className="hover:text-white transition-colors">{lang === 'pt' ? 'Termos de Uso' : 'Terms of Use'}</Link></li>
+              <li><Link to="/cookies" className="hover:text-white transition-colors">Cookies</Link></li>
             </ul>
           </div>
         </div>

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Language, Car, Lead, UserProfile, UserRole, BlogPost } from '../types';
+import { useNavigate } from 'react-router-dom';
+import { Language, Car, UserProfile, UserRole, BlogPost } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabase';
 
 interface AdminDashboardProps {
@@ -10,6 +10,7 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
+  const navigate = useNavigate();
   const t = TRANSLATIONS[lang].admin;
   const tc = TRANSLATIONS[lang].common;
 
@@ -35,31 +36,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
     content: ''
   });
 
+  useEffect(() => {
+    const verifyAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || user.user_metadata?.role !== UserRole.ADMIN) {
+        navigate('/admin/login');
+        return;
+      }
+      fetchPlatformData();
+    };
+    verifyAdmin();
+  }, [navigate]);
+
   const fetchPlatformData = async () => {
     setLoading(true);
-    
-    // Contagem de Carros
-    const { data: carsData } = await supabase.from('cars').select('*');
-    if (carsData) setAds(carsData);
+    try {
+      // Contagem de Carros
+      const { data: carsData } = await supabase.from('cars').select('*');
+      if (carsData) setAds(carsData);
 
-    // Contagem de Leads
-    const { count: lCount } = await supabase.from('leads').select('*', { count: 'exact', head: true });
-    if (lCount !== null) setLeadsCount(lCount);
+      // Contagem de Leads
+      const { count: lCount } = await supabase.from('leads').select('*', { count: 'exact', head: true });
+      if (lCount !== null) setLeadsCount(lCount);
 
-    // Busca de Usuários (Profiles)
-    const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-    if (userData) setUsers(userData);
+      // Busca de Usuários (Profiles)
+      const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+      if (userData) setUsers(userData);
 
-    // Busca de Artigos
-    const { data: blogData } = await supabase.from('blog_posts').select('*').order('date', { ascending: false });
-    if (blogData) setArticles(blogData);
-
-    setLoading(false);
+      // Busca de Artigos
+      const { data: blogData } = await supabase.from('blog_posts').select('*').order('date', { ascending: false });
+      if (blogData) setArticles(blogData);
+    } catch (err) {
+      console.error("Error fetching admin data:", err);
+    } finally {
+      setLoading(false);
+    }
   };
-
-  useEffect(() => {
-    fetchPlatformData();
-  }, []);
 
   const handleDeleteAd = async (id: string) => {
     if (!window.confirm(tc.confirmDelete)) return;
@@ -168,7 +180,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
                 <h3 className="text-2xl font-bold text-gray-900 mt-2">{loading ? '...' : leadsCount}</h3>
               </div>
             </div>
-            {/* Charts would go here */}
           </div>
         )}
 
@@ -298,7 +309,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
           </div>
         )}
 
-        {/* Existing Users Tab Code */}
         {activeTab === 'users' && (
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-500">
             <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -369,7 +379,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
           </div>
         )}
 
-        {/* Existing Ads Tab Code */}
         {activeTab === 'ads' && (
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-500">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">

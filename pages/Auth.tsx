@@ -35,7 +35,8 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
     
     try {
       if (mode === 'register') {
-        const { data, error: signUpError } = await supabase.auth.signUp({
+        // 1. Criar o utilizador no Supabase Auth
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
           options: {
@@ -46,9 +47,29 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
             }
           }
         });
+
         if (signUpError) throw signUpError;
+
+        // 2. Criar o perfil na tabela pública 'profiles' para ser visível no Admin Dashboard
+        if (signUpData.user) {
+          const { error: profileError } = await supabase.from('profiles').insert([{
+            id: signUpData.user.id,
+            full_name: formData.name,
+            email: formData.email,
+            role: userType,
+            stand_name: userType === UserRole.STAND ? formData.standName : null,
+            created_at: new Date().toISOString()
+          }]);
+          
+          if (profileError) {
+            console.error("Erro ao criar perfil público:", profileError);
+            // Mesmo com erro no perfil, o utilizador foi criado. 
+            // Mas para o admin ver, precisamos disto.
+          }
+        }
       } else {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        // Fluxo de Login
+        const { error: signInError } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
