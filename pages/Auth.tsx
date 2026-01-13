@@ -31,6 +31,7 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
     setError(null);
     
     try {
+      // Bypass para Admin fixo
       if (mode === 'login' && formData.email === 'admin@facilitadorcar.pt' && formData.password === 'admin123') {
         localStorage.setItem('fc_session', JSON.stringify({
           email: formData.email, role: UserRole.ADMIN, timestamp: new Date().getTime()
@@ -61,7 +62,7 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
         if (signUpError) throw signUpError;
 
         if (signUpData.user) {
-          // Tentar criar perfil, mas não bloquear se a tabela não existir
+          // Criar perfil na tabela pública
           const { error: profileError } = await supabase.from('profiles').insert([{
             id: signUpData.user.id,
             full_name: formData.name,
@@ -70,13 +71,9 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
             stand_name: userType === UserRole.STAND ? formData.standName : null,
             created_at: new Date().toISOString()
           }]);
-
-          if (profileError && !profileError.message.includes('profiles')) {
-             throw profileError;
-          }
           
-          if (profileError && profileError.message.includes('profiles')) {
-            console.warn("Tabela 'profiles' ausente. Perfil guardado apenas no Auth Metadata.");
+          if (profileError) {
+            console.warn("Profile table insert failed, metadata is used as fallback.", profileError.message);
           }
         }
       } else {
@@ -88,7 +85,7 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
 
       setIsSuccess(true);
       const { data: { user } } = await supabase.auth.getUser();
-      let roleToSet: UserRole = UserRole.VISITOR;
+      let roleToSet: UserRole = userType;
       
       if (user?.email === 'admin@facilitadorcar.pt') {
         roleToSet = UserRole.ADMIN;
@@ -112,20 +109,6 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
     }
   };
 
-  if (isSuccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="bg-white p-12 rounded-[40px] shadow-2xl text-center max-w-md w-full animate-in zoom-in duration-300">
-          <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8 text-4xl">
-            <i className="fas fa-check"></i>
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">{mode === 'login' ? t.successLogin : t.successRegister}</h2>
-          <p className="text-gray-500">A redirecionar...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -135,31 +118,68 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
           </div>
           <span className="font-bold text-3xl tracking-tight text-gray-900">Facilitador<span className="text-blue-600">Car</span></span>
         </Link>
-        <h2 className="text-center text-3xl font-extrabold text-gray-900">{mode === 'login' ? t.loginTitle : t.registerTitle}</h2>
+        <h2 className="text-center text-3xl font-extrabold text-gray-900">
+          {mode === 'login' ? t.loginTitle : t.registerTitle}
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-500">
+          {mode === 'login' ? t.loginSubtitle : t.registerSubtitle}
+        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-10 px-6 shadow-xl sm:rounded-[40px] border border-gray-100 sm:px-12">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-medium border border-red-100 flex items-center">
+            <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-medium border border-red-100 flex items-center animate-in fade-in slide-in-from-top-2">
               <i className="fas fa-exclamation-circle mr-2"></i> {error}
             </div>
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
             {mode === 'register' && (
-              <>
+              <div className="space-y-6">
+                {/* Account Type Selection */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-3">{t.userType}</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setUserType(UserRole.VISITOR)}
+                      className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                        userType === UserRole.VISITOR 
+                          ? 'border-blue-600 bg-blue-50 text-blue-700' 
+                          : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
+                      }`}
+                    >
+                      <i className="fas fa-user mb-2 text-xl"></i>
+                      <span className="text-xs font-bold">{t.typeBuyer}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserType(UserRole.STAND)}
+                      className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                        userType === UserRole.STAND 
+                          ? 'border-blue-600 bg-blue-50 text-blue-700' 
+                          : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
+                      }`}
+                    >
+                      <i className="fas fa-store mb-2 text-xl"></i>
+                      <span className="text-xs font-bold">{t.typeStand}</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">{t.name}</label>
-                  <input required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm" placeholder="João Silva" />
+                  <input required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm" placeholder="Ex: João Silva" />
                 </div>
+
                 {userType === UserRole.STAND && (
-                  <div>
+                  <div className="animate-in fade-in slide-in-from-top-2">
                     <label className="block text-sm font-bold text-gray-700 mb-2">{t.standName}</label>
                     <input required type="text" value={formData.standName} onChange={(e) => setFormData({...formData, standName: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm" placeholder="Ex: Porto Motors" />
                   </div>
                 )}
-              </>
+              </div>
             )}
 
             <div>
@@ -172,16 +192,27 @@ const Auth: React.FC<AuthProps> = ({ lang, mode: initialMode, onLogin }) => {
               <input required type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm" placeholder="••••••••" />
             </div>
 
-            <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-5 px-4 rounded-2xl shadow-xl font-black text-lg text-white transition-all bg-blue-600 hover:bg-blue-700 shadow-blue-100">
+            <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-5 px-4 rounded-2xl shadow-xl font-black text-lg text-white transition-all bg-blue-600 hover:bg-blue-700 shadow-blue-100 disabled:opacity-50">
               {isSubmitting ? <i className="fas fa-circle-notch animate-spin"></i> : (mode === 'login' ? t.submitLogin : t.submitRegister)}
             </button>
           </form>
 
           <div className="mt-8 text-center flex flex-col space-y-4">
-            <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="text-sm font-bold text-blue-600 hover:text-blue-500">
+            <button 
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login');
+                setError(null);
+              }} 
+              className="text-sm font-bold text-blue-600 hover:text-blue-500"
+            >
               {mode === 'login' ? t.noAccount : t.hasAccount}
             </button>
-            <Link to="/admin/login" className="text-[10px] font-black uppercase tracking-widest text-gray-300 hover:text-indigo-500">Acesso Staff / Administrador</Link>
+            {mode === 'login' && (
+              <Link to="/esqueci-senha" size="sm" className="text-xs text-gray-400 hover:text-gray-600">
+                {t.forgotPassword}
+              </Link>
+            )}
+            <Link to="/admin/login" className="text-[10px] font-black uppercase tracking-widest text-gray-200 hover:text-indigo-500 transition-colors">Acesso Staff / Administrador</Link>
           </div>
         </div>
       </div>
