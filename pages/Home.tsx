@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Language, Car } from '../types';
-import { TRANSLATIONS } from '../constants';
+import { TRANSLATIONS, MOCK_CARS } from '../constants';
 import CarCard from '../components/CarCard';
 import LeadForm from '../components/LeadForm';
 import { supabase } from '../lib/supabase';
@@ -25,34 +25,47 @@ const Home: React.FC<HomeProps> = ({ lang, onToggleFavorite, favorites }) => {
   const [featuredCars, setFeaturedCars] = useState<Car[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // Carregar veículos do Supabase
   useEffect(() => {
     const fetchFeatured = async () => {
-      const { data, error } = await supabase
-        .from('cars')
-        .select('*')
-        .limit(4);
-      
-      if (!error && data) {
-        setFeaturedCars(data);
+      try {
+        const { data, error } = await supabase
+          .from('cars')
+          .select('*')
+          .limit(4);
+        
+        if (!error && data && data.length > 0) {
+          setFeaturedCars(data);
+        } else {
+          setFeaturedCars(MOCK_CARS);
+        }
+      } catch (err) {
+        setFeaturedCars(MOCK_CARS);
       }
     };
     fetchFeatured();
   }, []);
 
-  // Simulação de pesquisa dinâmica (agora real)
   useEffect(() => {
     if (searchQuery.length > 1) {
       setIsSearching(true);
       const timer = setTimeout(async () => {
-        const { data, error } = await supabase
-          .from('cars')
-          .select('*')
-          .or(`brand.ilike.%${searchQuery}%,model.ilike.%${searchQuery}%`)
-          .limit(5);
-        
-        if (!error && data) {
-          setSuggestions(data);
+        try {
+          const { data, error } = await supabase
+            .from('cars')
+            .select('*')
+            .or(`brand.ilike.%${searchQuery}%,model.ilike.%${searchQuery}%`)
+            .limit(5);
+          
+          if (!error && data) {
+            setSuggestions(data);
+          } else {
+            setSuggestions(MOCK_CARS.filter(c => 
+              c.brand.toLowerCase().includes(searchQuery.toLowerCase()) || 
+              c.model.toLowerCase().includes(searchQuery.toLowerCase())
+            ).slice(0, 5));
+          }
+        } catch (err) {
+          setSuggestions([]);
         }
         setIsSearching(false);
         setShowSuggestions(true);

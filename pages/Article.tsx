@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Language, BlogPost } from '../types';
-import { TRANSLATIONS } from '../constants';
+import { TRANSLATIONS, MOCK_BLOG } from '../constants';
 import { supabase } from '../lib/supabase';
 
 interface ArticleProps {
@@ -21,25 +21,44 @@ const Article: React.FC<ArticleProps> = ({ lang }) => {
   useEffect(() => {
     const fetchArticle = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (!error && data) {
-        setArticle(data);
-        
-        // Buscar outros para recomendação
-        const { data: related } = await supabase
+      try {
+        const { data, error } = await supabase
           .from('blog_posts')
           .select('*')
-          .neq('id', id)
-          .limit(2);
+          .eq('id', id)
+          .single();
         
-        if (related) setRelatedArticles(related);
+        if (!error && data) {
+          setArticle(data);
+          
+          const { data: related } = await supabase
+            .from('blog_posts')
+            .select('*')
+            .neq('id', id)
+            .limit(2);
+          
+          if (related && related.length > 0) {
+            setRelatedArticles(related);
+          } else {
+            setRelatedArticles(MOCK_BLOG.filter(b => b.id !== id).slice(0, 2));
+          }
+        } else {
+          // Fallback local
+          const localMatch = MOCK_BLOG.find(b => b.id === id);
+          if (localMatch) {
+            setArticle(localMatch);
+            setRelatedArticles(MOCK_BLOG.filter(b => b.id !== id).slice(0, 2));
+          }
+        }
+      } catch (err) {
+        const localMatch = MOCK_BLOG.find(b => b.id === id);
+        if (localMatch) {
+          setArticle(localMatch);
+          setRelatedArticles(MOCK_BLOG.filter(b => b.id !== id).slice(0, 2));
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     if (id) fetchArticle();
@@ -131,7 +150,7 @@ const Article: React.FC<ArticleProps> = ({ lang }) => {
               <h4 className="font-bold text-gray-900 mb-4">{lang === 'pt' ? 'Sobre o Autor' : 'About the Author'}</h4>
               <div className="flex items-center mb-4">
                 <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold mr-3">
-                  {article.author[0]}
+                  {article.author?.[0] || 'A'}
                 </div>
                 <div>
                   <p className="font-bold text-sm">{article.author}</p>

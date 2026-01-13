@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Language, BlogPost } from '../types';
-import { TRANSLATIONS } from '../constants';
+import { TRANSLATIONS, MOCK_BLOG } from '../constants';
 import { supabase } from '../lib/supabase';
 
 interface BlogProps {
@@ -11,21 +11,44 @@ interface BlogProps {
 
 const Blog: React.FC<BlogProps> = ({ lang }) => {
   const t = TRANSLATIONS[lang].blog;
-  const [posts, setPosts] = useState<BlogPost[]>([]);
+  // Inicializamos com MOCK_BLOG para visualização imediata
+  const [posts, setPosts] = useState<BlogPost[]>(MOCK_BLOG);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchPosts = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (!error && data) {
-        setPosts(data);
+      try {
+        const { data, error } = await supabase
+          .from('blog_posts')
+          .select('*')
+          .order('date', { ascending: false });
+        
+        if (!error && data) {
+          // MESCLAGEM: Mantemos os dados do Supabase e adicionamos os MOCK_BLOG que não existem no DB
+          const dbPosts: BlogPost[] = data;
+          const mergedPosts = [...dbPosts];
+          
+          MOCK_BLOG.forEach(mockPost => {
+            const exists = mergedPosts.some(p => p.id === mockPost.id || p.title === mockPost.title);
+            if (!exists) {
+              mergedPosts.push(mockPost);
+            }
+          });
+
+          // Ordenar por data (mais recentes primeiro)
+          mergedPosts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setPosts(mergedPosts);
+        } else {
+          // Se houver erro ou tabela vazia, garantimos que os 7 locais apareçam
+          setPosts(MOCK_BLOG);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar blog posts:", err);
+        setPosts(MOCK_BLOG);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchPosts();
   }, []);
@@ -37,20 +60,23 @@ const Blog: React.FC<BlogProps> = ({ lang }) => {
         <p className="text-xl text-gray-500 max-w-2xl mx-auto">{t.subtitle}</p>
       </div>
 
-      {loading ? (
+      {loading && posts.length === 0 ? (
         <div className="flex justify-center py-20">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           {posts.map(post => (
-            <Link to={`/blog/${post.id}`} key={post.id} className="group cursor-pointer block">
+            <Link to={`/blog/${post.id}`} key={post.id} className="group cursor-pointer block animate-in fade-in slide-in-from-bottom-4 duration-500">
               <article>
                 <div className="relative aspect-video rounded-3xl overflow-hidden mb-6 shadow-xl">
                   <img 
                     src={post.image} 
                     alt={post.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&q=80&w=800';
+                    }}
                   />
                   <div className="absolute top-6 left-6 flex items-center space-x-2">
                     <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
@@ -68,7 +94,7 @@ const Blog: React.FC<BlogProps> = ({ lang }) => {
                       {new Date(post.date).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-US')}
                     </span>
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors mb-4 line-clamp-2">
                     {post.title}
                   </h2>
                   <p className="text-gray-500 leading-relaxed mb-6 line-clamp-2">{post.excerpt}</p>
