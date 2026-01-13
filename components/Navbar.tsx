@@ -9,11 +9,10 @@ interface NavbarProps {
   role: UserRole;
   isLoggedIn: boolean;
   onToggleLang: () => void;
-  onToggleRole: () => void;
   onLogout: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ lang, role, isLoggedIn, onToggleLang, onToggleRole, onLogout }) => {
+const Navbar: React.FC<NavbarProps> = ({ lang, role, isLoggedIn, onToggleLang, onLogout }) => {
   const t = TRANSLATIONS[lang].nav;
   const location = useLocation();
   const navigate = useNavigate();
@@ -65,15 +64,6 @@ const Navbar: React.FC<NavbarProps> = ({ lang, role, isLoggedIn, onToggleLang, o
               </Link>
             ) : (
               <>
-                <button 
-                  onClick={onToggleRole}
-                  className="text-[10px] text-gray-400 hover:text-gray-600 font-bold uppercase tracking-wider hidden md:block"
-                  title="Simular Troca de Perfil"
-                >
-                  <i className="fas fa-sync-alt mr-1"></i>
-                  {role}
-                </button>
-                
                 {role === UserRole.ADMIN ? (
                   <Link to="/admin" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all">
                     <i className="fas fa-tools mr-2"></i>

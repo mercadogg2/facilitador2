@@ -85,14 +85,6 @@ const App: React.FC = () => {
 
   const toggleLanguage = () => setLanguage(prev => prev === 'pt' ? 'en' : 'pt');
   
-  const toggleRole = () => {
-    setRole(prev => {
-      if (prev === UserRole.VISITOR) return UserRole.STAND;
-      if (prev === UserRole.STAND) return UserRole.ADMIN;
-      return UserRole.VISITOR;
-    });
-  };
-
   const handleToggleFavorite = (id: string) => {
     setFavorites(prev => prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]);
   };
@@ -127,7 +119,6 @@ const App: React.FC = () => {
           role={role} 
           isLoggedIn={isLoggedIn}
           onToggleLang={toggleLanguage} 
-          onToggleRole={toggleRole} 
           onLogout={handleLogout}
         />
         
